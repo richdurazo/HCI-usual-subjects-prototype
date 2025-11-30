@@ -10,6 +10,7 @@ import { Toaster } from 'sonner'
 function App() {
   const [currentView, setCurrentView] = useState('landing')
   const [showInsights, setShowInsights] = useState(false)
+  const [insightsData, setInsightsData] = useState({ resumeBullets: [], requirementStatus: [] })
 
   const handleAnalyzeResume = () => {
     // Navigate to analysis view
@@ -59,8 +60,16 @@ function App() {
         />
       ) : (
         <>
-          <AnalysisView onBack={handleBackToLanding} />
-          <InsightsSidebar isOpen={showInsights} onClose={() => setShowInsights(false)} />
+          <AnalysisView 
+            onBack={handleBackToLanding}
+            onDataChange={setInsightsData}
+          />
+          <InsightsSidebar 
+            isOpen={showInsights} 
+            onClose={() => setShowInsights(false)}
+            resumeBullets={insightsData.resumeBullets || []}
+            requirementStatus={insightsData.requirementStatus || []}
+          />
         </>
       )}
 

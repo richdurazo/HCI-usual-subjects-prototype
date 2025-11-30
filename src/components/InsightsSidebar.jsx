@@ -1,126 +1,226 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { X, BarChart3, Target } from 'lucide-react'
 import { Button } from './ui/button'
 import { ResumeLevelInsights } from './ResumeLevelInsights'
 import { SkillsToEvidenceTracker } from './SkillsToEvidenceTracker'
 import { ColorCodeLegend } from './ColorCodeLegend'
 
-export function InsightsSidebar({ isOpen, onClose }) {
+export function InsightsSidebar({ isOpen, onClose, resumeBullets = [], requirementStatus = [] }) {
   const [activeTab, setActiveTab] = useState('insights') // 'insights' or 'skills'
 
-  // Mock data - Example showing realistic alignment analysis
-  const insightsData = {
-    overallScore: 72,
-    improvementPotential: 15,
-    strengths: [
-      'Strong technical keyword coverage (React, TypeScript) - matches 2 key requirements',
-      'Clear action verbs used consistently (Built, Created, Worked)',
-      'Dashboard and data visualization experience mentioned',
-    ],
-    weaknesses: [
-      'Missing quantifiable metrics in all bullets',
-      'No mention of GraphQL or Python experience',
-      'Limited details on API development and cross-functional collaboration',
-      'Weak action verbs in some bullets ("Worked with", "Worked on")',
-    ],
-    topKeywords: [
-      { word: 'React', frequency: 3 },
-      { word: 'TypeScript', frequency: 2 },
-      { word: 'Dashboard', frequency: 2 },
-      { word: 'Team', frequency: 2 },
-      { word: 'Data', frequency: 2 },
-      { word: 'API', frequency: 1 },
-    ],
-    missingCritical: [
-      'GraphQL experience (mentioned in Required Skills)',
-      'Python proficiency for data analysis and automation',
-      'RESTful API integration details',
-    ],
-  }
+  // Calculate insights dynamically based on current resume bullets and requirements
+  const insightsData = useMemo(() => {
+    // Debug: log when data changes
+    console.log('InsightsSidebar recalculating insights:', { 
+      resumeBulletsCount: resumeBullets?.length, 
+      requirementStatusCount: requirementStatus?.length,
+      resumeBullets: resumeBullets,
+      requirementStatus: requirementStatus
+    })
+    // Handle empty data
+    if (!requirementStatus || requirementStatus.length === 0 || !resumeBullets || resumeBullets.length === 0) {
+      return {
+        overallScore: 0,
+        improvementPotential: 100,
+        strengths: [],
+        weaknesses: [],
+        topKeywords: [],
+        missingCritical: [],
+      }
+    }
 
-  const skillsData = [
-    {
-      skill: 'React & Modern JavaScript',
-      required: true,
-      status: 'strong',
-      bullets: [
-        'Built and maintained React + TypeScript dashboards used daily by sales teams.',
-      ],
-      gaps: [],
-      jobSource: 'Experience with React and modern JavaScript frameworks',
-    },
-    {
-      skill: 'TypeScript',
-      required: true,
-      status: 'strong',
-      bullets: [
-        'Built and maintained React + TypeScript dashboards used daily by sales teams.',
-      ],
-      gaps: ['Could emphasize type-safe patterns or complex type definitions'],
-      jobSource: 'Strong understanding of TypeScript and type-safe development',
-    },
-    {
-      skill: 'Data Visualization',
-      required: true,
-      status: 'partial',
-      bullets: [
-        'Built and maintained React + TypeScript dashboards used daily by sales teams.',
-      ],
-      gaps: [
-        'No specific charting libraries mentioned (D3, Recharts, Chart.js)',
-        'Missing details about what data was visualized',
-      ],
-      jobSource: 'Experience with data visualization and dashboard design',
-    },
-    {
-      skill: 'GraphQL & API Integration',
-      required: true,
-      status: 'missing',
-      bullets: [],
-      gaps: [
-        'No mention of GraphQL experience',
-        'Limited API integration details (only mentions "Worked on API development")',
-      ],
-      jobSource: 'Experience with GraphQL and REST API integration',
-    },
-    {
-      skill: 'Python for Data Analysis',
-      required: true,
-      status: 'missing',
-      bullets: [],
-      gaps: [
-        'No mention of Python',
-        'Automation scripts mentioned but language not specified',
-      ],
-      jobSource: 'Proficiency in Python for data analysis and automation',
-    },
-    {
-      skill: 'Cross-Functional Collaboration',
-      required: true,
-      status: 'partial',
-      bullets: [
-        'Worked with team to build customer portal.',
-      ],
-      gaps: [
-        'Could emphasize collaboration with product, design, or other teams',
-        'Missing specific examples of cross-functional work',
-      ],
-      jobSource: 'Demonstrated cross-functional collaboration skills',
-    },
-    {
-      skill: 'Measurable Business Impact',
-      required: true,
-      status: 'partial',
-      bullets: [
-        'Built and maintained React + TypeScript dashboards used daily by sales teams.',
-      ],
-      gaps: [
-        'Missing quantifiable metrics or outcomes',
-        'No specific business impact mentioned',
-      ],
-      jobSource: 'Track record of delivering measurable business impact',
-    },
-  ]
+    const covered = requirementStatus.filter(r => r.status === 'covered').length
+    const partial = requirementStatus.filter(r => r.status === 'partial').length
+    const missing = requirementStatus.filter(r => r.status === 'missing').length
+    const total = requirementStatus.length
+    const overallScore = total > 0 ? Math.round((covered / total) * 100) : 0
+    const improvementPotential = Math.max(0, 100 - overallScore)
+
+    // Count keywords in resume bullets
+    const keywordCounts = {}
+    resumeBullets.forEach(bullet => {
+      const text = bullet.text.toLowerCase()
+      const keywords = ['react', 'typescript', 'dashboard', 'team', 'data', 'api', 'graphql', 'python', 'collaboration']
+      keywords.forEach(keyword => {
+        if (text.includes(keyword)) {
+          keywordCounts[keyword] = (keywordCounts[keyword] || 0) + 1
+        }
+      })
+    })
+
+    // Check for metrics/impact indicators
+    const hasMetrics = resumeBullets.some(b => {
+      const text = b.text.toLowerCase()
+      return /\d+%/.test(text) || /\d+/.test(text) || text.includes('increase') || text.includes('reduce') || text.includes('improve')
+    })
+
+    // Check for strong action verbs
+    const strongVerbs = ['built', 'created', 'developed', 'designed', 'led', 'managed', 'optimized', 'delivered']
+    const hasStrongVerbs = resumeBullets.some(b => {
+      const text = b.text.toLowerCase()
+      return strongVerbs.some(verb => text.startsWith(verb))
+    })
+
+    // Identify strengths
+    const strengths = []
+    if (covered >= 2) {
+      strengths.push(`Strong technical keyword coverage - matches ${covered} key requirements`)
+    }
+    if (hasStrongVerbs) {
+      strengths.push('Clear action verbs used consistently')
+    }
+    if (resumeBullets.some(b => b.text.toLowerCase().includes('dashboard'))) {
+      strengths.push('Dashboard and data visualization experience mentioned')
+    }
+
+    // Identify weaknesses
+    const weaknesses = []
+    if (!hasMetrics) {
+      weaknesses.push('Missing quantifiable metrics in all bullets')
+    }
+    if (!resumeBullets.some(b => b.text.toLowerCase().includes('graphql'))) {
+      weaknesses.push('No mention of GraphQL experience')
+    }
+    if (!resumeBullets.some(b => b.text.toLowerCase().includes('python'))) {
+      weaknesses.push('No mention of Python experience')
+    }
+    if (resumeBullets.some(b => b.text.toLowerCase().includes('worked with') || b.text.toLowerCase().includes('worked on'))) {
+      weaknesses.push('Weak action verbs in some bullets ("Worked with", "Worked on")')
+    }
+
+    // Missing critical requirements
+    const missingCritical = requirementStatus
+      .filter(r => r.status === 'missing')
+      .map(r => r.requirement)
+
+    // Top keywords
+    const topKeywords = Object.entries(keywordCounts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 6)
+      .map(([word, frequency]) => ({ word: word.charAt(0).toUpperCase() + word.slice(1), frequency }))
+
+    return {
+      overallScore,
+      improvementPotential,
+      strengths,
+      weaknesses,
+      topKeywords,
+      missingCritical,
+    }
+  }, [resumeBullets, requirementStatus])
+
+  // Calculate skills data dynamically based on resume bullets and requirements
+  const skillsData = useMemo(() => {
+    // Debug: log when data changes
+    console.log('InsightsSidebar recalculating skills:', { 
+      resumeBulletsCount: resumeBullets?.length, 
+      requirementStatusCount: requirementStatus?.length 
+    })
+    // Handle empty data
+    if (!resumeBullets || resumeBullets.length === 0 || !requirementStatus || requirementStatus.length === 0) {
+      return []
+    }
+
+    const skillMappings = [
+      {
+        skill: 'React & Modern JavaScript',
+        keywords: ['react', 'javascript', 'typescript'],
+        jobSource: 'Experience with React and modern JavaScript frameworks',
+      },
+      {
+        skill: 'TypeScript',
+        keywords: ['typescript', 'type-safe', 'types'],
+        jobSource: 'Strong understanding of TypeScript and type-safe development',
+      },
+      {
+        skill: 'Data Visualization & Dashboard Design',
+        keywords: ['dashboard', 'visualization', 'data visualization', 'chart'],
+        jobSource: 'Experience with data visualization and dashboard design',
+      },
+      {
+        skill: 'GraphQL & API Integration',
+        keywords: ['graphql', 'rest', 'api', 'endpoint'],
+        jobSource: 'Experience with GraphQL and REST API integration',
+      },
+      {
+        skill: 'Python for Data Analysis',
+        keywords: ['python', 'data analysis', 'automation', 'script'],
+        jobSource: 'Proficiency in Python for data analysis and automation',
+      },
+      {
+        skill: 'Cross-Functional Collaboration',
+        keywords: ['cross-functional', 'collaboration', 'team', 'led', 'managed'],
+        jobSource: 'Demonstrated cross-functional collaboration skills',
+      },
+      {
+        skill: 'Measurable Business Impact',
+        keywords: ['impact', 'metric', 'result', 'improve', 'reduce', 'increase', '%'],
+        jobSource: 'Track record of delivering measurable business impact',
+      },
+    ]
+
+    return skillMappings.map(skillMapping => {
+      const matchingBullets = resumeBullets.filter(bullet => {
+        const text = bullet.text.toLowerCase()
+        // Check if any keyword matches (case-insensitive)
+        return skillMapping.keywords.some(keyword => {
+          const keywordLower = keyword.toLowerCase()
+          // Handle multi-word keywords like "data analysis"
+          if (keywordLower.includes(' ')) {
+            return text.includes(keywordLower)
+          }
+          // For single words, check for whole word or as part of compound words
+          return text.includes(keywordLower)
+        })
+      })
+
+      const matchCount = matchingBullets.length
+      
+      // Find corresponding requirement to get status
+      const requirement = requirementStatus.find(r => 
+        r.requirement === skillMapping.jobSource
+      )
+      
+      // Use requirement status if available (more accurate), otherwise calculate from match count
+      let status = 'missing'
+      if (requirement) {
+        // Map requirement status to skill status
+        status = requirement.status === 'covered' ? 'strong' : 
+                 requirement.status === 'partial' ? 'partial' : 
+                 'missing'
+      } else {
+        // Fallback: calculate from match count
+        if (matchCount >= 2) {
+          status = 'strong'
+        } else if (matchCount === 1) {
+          status = 'partial'
+        }
+      }
+
+      // Determine gaps based on status
+      const gaps = []
+      if (status === 'missing') {
+        gaps.push(`No evidence found in current resume`)
+      } else if (status === 'partial') {
+        if (matchCount === 1) {
+          gaps.push(`Could be strengthened with more specific examples`)
+        }
+        // Add requirement-specific gaps if available
+        if (requirement && requirement.matchingBullets === 1) {
+          gaps.push(`Only ${requirement.matchingBullets} bullet matches - consider adding more evidence`)
+        }
+      }
+
+      return {
+        skill: skillMapping.skill,
+        required: true,
+        status,
+        bullets: matchingBullets.map(b => b.text),
+        gaps,
+        jobSource: skillMapping.jobSource,
+      }
+    })
+  }, [resumeBullets, requirementStatus])
 
   return (
     <>

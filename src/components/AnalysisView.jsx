@@ -4,7 +4,7 @@ import { SuggestionsListView } from './SuggestionsListView'
 import { Button } from './ui/button'
 import { toast } from 'sonner'
 
-export function AnalysisView({ onBack }) {
+export function AnalysisView({ onBack, onDataChange }) {
   const [activeFilter, setActiveFilter] = useState('all')
 
   // Mock resume bullets (editable) - matches what's being analyzed
@@ -74,7 +74,22 @@ export function AnalysisView({ onBack }) {
   const requirementStatus = useMemo(() => {
     return baseRequirements.map(req => {
       const allBulletTexts = resumeBullets.map(b => b.text.toLowerCase())
+      
+      // For Python and GraphQL requirements, require the primary keyword to be present
+      const requiresPrimaryKeyword = req.id === '5' || req.id === '6' // GraphQL or Python
+      const primaryKeywords = req.id === '5' ? ['graphql'] : req.id === '6' ? ['python'] : []
+      
       const matchingBullets = allBulletTexts.filter(bulletText => {
+        // If this requirement needs the primary keyword, check for it first
+        if (requiresPrimaryKeyword && primaryKeywords.length > 0) {
+          const hasPrimaryKeyword = primaryKeywords.some(keyword => 
+            bulletText.includes(keyword.toLowerCase())
+          )
+          if (!hasPrimaryKeyword) {
+            return false // Don't count as match if primary keyword is missing
+          }
+        }
+        // Then check if any keyword matches
         return req.keywords.some(keyword => 
           bulletText.includes(keyword.toLowerCase())
         )
@@ -393,6 +408,22 @@ export function AnalysisView({ onBack }) {
 
     return () => clearInterval(interval)
   }, [])
+
+  // Update Insights sidebar data whenever resume bullets or requirements change
+  // Also run on initial mount to pass initial data
+  useEffect(() => {
+    if (onDataChange && resumeBullets.length > 0 && requirementStatus.length > 0) {
+      // Create new arrays/objects to ensure React detects the change
+      // Use JSON parse/stringify to create truly new references
+      const newResumeBullets = JSON.parse(JSON.stringify(resumeBullets))
+      const newRequirementStatus = JSON.parse(JSON.stringify(requirementStatus))
+      onDataChange({
+        resumeBullets: newResumeBullets,
+        requirementStatus: newRequirementStatus,
+      })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resumeBullets, requirementStatus])
 
   const filteredSuggestions = activeFilter === 'all' 
     ? suggestions 
